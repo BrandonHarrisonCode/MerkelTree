@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
-from os import walk
-from os.path import isfile, join
+from os import listdir
+from os.path import isdir, join
 from hashlib import md5
 import sys
 
@@ -31,29 +31,39 @@ class Node:
         # print('{}Generating hash for {}'.format(' ' * indent * 2, path))
         file_hash = md5()
 
-        if isfile(path):
+        if isdir(path):
+            file_hash.update(''.encode('utf-8'))
+        else:
             with open(path, 'rb') as f:
                 for chunk in iter(lambda: f.read(4096), b''):
                     file_hash.update(chunk)
-        else:
-            file_hash.update(''.encode('utf-8'))
         return file_hash.hexdigest()
 
 
     def __str__(self):
-        output = '' + self.get_hash() + ' (' + self.path + ')'
-        count = 0
+        BLUE = '\033[94m'
+        ENDC = '\033[0m'
+
+        if isdir(self.path):
+            output = BLUE + self.path + ENDC + ' (' + self.get_hash() + ')'
+        else:
+            output = self.path + ' (' + self.get_hash() + ')'
+        child_count = 0
         for child in self.children:
             toadd = str(child)
+            line_count = 0
             for line in toadd.split('\n'):
-                if line[0] == '\\' or line[0] == '|':
-                    output += '\n   ' + line
+                output += '\n'
+                if line_count == 0 and child_count == len(self.children) - 1:
+                    output += '`-- ' + line
+                elif line_count == 0 and child_count != len(self.children) - 1:
+                    output += '|-- ' + line
+                elif child_count != len(self.children) -1:
+                    output += '|   ' + line
                 else:
-                    if count == len(self.children) - 1:
-                        output += '\n\--' + line
-                    else:
-                        output += '\n|--' + line
-            count += 1
+                    output += '    ' + line
+                line_count += 1
+            child_count += 1
         return output
 
 
@@ -65,26 +75,15 @@ class Node:
         self.is_leaf = True
         # print('{}Created {} with hash: {}'.format(' ' * indent * 2, path, self.node_hash))
 
-        for rt, dirs, files in walk(path):
-            # print("{}Directories: {}".format(' ' * indent * 2, dirs))
-            # print("{}Files: {}".format(' ' * indent * 2, files))
-            # print("{}Pre-all Children count: {}".format(' ' * indent * 2, len(self.children)))
-            for dir in dirs:
-                if dir == './':
-                    continue
-                # print("{}Adding child called {}".format(' ' * indent * 2, dir))
-                indent += 1
-                new_child = Node(join(path, dir))
-                indent -= 1
-                self.add_child(new_child)
-            # print("{}Post-dir Children count: {}".format(' ' * indent * 2, len(self.children)))
-            for file in files:
-                # print("{}Adding file called {}".format(' ' * indent * 2, file))
-                indent += 1
-                new_child = Node(join(path, file))
-                indent -= 1
-                self.add_child(new_child)
-            # print("{}Post-files Children count: {}".format(' ' * indent * 2, len(self.children)))
+        if not isdir(path):
+            # print("{}Exiting init".format(' ' * indent * 2))
+            return
+        for obj in sorted(listdir(path)):
+            # print("{}Adding child called {}".format(' ' * indent * 2, dir))
+            indent += 1
+            new_child = Node(join(path, obj))
+            indent -= 1
+            self.add_child(new_child)
 
         # print("{}Exiting init".format(' ' * indent * 2))
 
